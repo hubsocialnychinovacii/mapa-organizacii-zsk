@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zmapované organizácie — Žilinský kraj | HUSI</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body { margin:0; padding:0; height:100%; font-family:'Segoe UI', Arial, sans-serif; }
+  #wrap { display:flex; height:100vh; }
+  #map { flex:1; height:100%; }
+  #panel {
+    width:300px; height:100%; overflow-y:auto; background:#fff;
+    border-left:1px solid #ddd; box-shadow:-2px 0 6px rgba(0,0,0,0.08); flex-shrink:0;
+  }
+  #panel h2 { font-size:14px; color:#1a3c5e; margin:12px 12px 6px 12px; }
+  .panel-item {
+    display:flex; align-items:center; gap:8px; padding:6px 12px; cursor:pointer;
+    font-size:12.5px; line-height:1.3; border-bottom:1px solid #f2f2f2;
+  }
+  .panel-item:hover { background:#eef4fa; }
+  .panel-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; border:1.5px solid #fff; box-shadow:0 0 2px rgba(0,0,0,0.5); }
+  @media (max-width:700px){
+    #wrap { flex-direction:column; }
+    #panel { width:100%; height:38%; border-left:none; border-top:1px solid #ddd; }
+  }
+  .credit-box {
+    position:absolute; top:10px; left:10px; z-index:1000;
+    background:rgba(255,255,255,0.95); border-radius:10px; padding:12px 16px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25); max-width:320px;
+  }
+  .credit-box h1 { font-size:16px; margin:0 0 4px 0; color:#1a3c5e; }
+  .credit-box p { font-size:12px; margin:2px 0; color:#444; }
+  .credit-box .autor { font-weight:600; color:#1a3c5e; }
+  .legend {
+    position:absolute; bottom:20px; left:10px; z-index:1000;
+    background:rgba(255,255,255,0.95); border-radius:10px; padding:10px 14px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25); font-size:13px;
+  }
+  .legend h3 { margin:0 0 6px 0; font-size:13px; color:#1a3c5e; }
+  .legend-item { display:flex; align-items:center; gap:8px; cursor:pointer; padding:3px 2px; user-select:none; }
+  .legend-item.off { opacity:0.35; }
+  .legend-dot { width:14px; height:14px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 3px rgba(0,0,0,0.5); flex-shrink:0; }
+  .legend small { color:#777; display:block; margin-top:6px; }
+  .popup-nazov { font-size:14px; font-weight:700; color:#1a3c5e; margin-bottom:4px; }
+  .popup-row { font-size:12px; margin:2px 0; }
+  .popup-row b { color:#555; }
+  .popup-desc { font-size:12px; margin:6px 0; font-style:italic; color:#333; }
+  .popup-links a { font-size:12px; margin-right:10px; }
+  .leaflet-popup-content { margin:12px 16px; min-width:220px; }
+  @media (max-width:600px){ .credit-box{max-width:230px; padding:8px 10px;} .credit-box h1{font-size:13px;} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="map"></div>
+  <div id="panel">
+    <h2>Organizácie na mape (A–Z)</h2>
+    <div id="panel-list"></div>
+  </div>
+</div>
+
+<div class="credit-box">
+  <h1>Zmapované organizácie — Žilinský kraj</h1>
+  <p class="autor">Spracovala Mgr. Gabriela Blahušiaková<br>INOVIA (Social innovation hub)</p>
+  <p>info@hu-si.sk | blahusiakova@inovia.sk</p>
+  <p style="font-style:italic; color:#2e7d32;">🌱 Mapa žije — organizácie stále pribúdajú. Chýbate tu? Ozvite sa nám.</p>
+</div>
+
+<div class="legend" id="legend">
+  <h3>Legenda — klikni pre filter</h3>
+  <small>Poloha bodov je orientačná (obec/ulica).<br>Údaje: verejné registre a weby organizácií, 7/2026.</small>
+</div>
+
+<script>
+const KATEGORIE = {
+  podporne:      { nazov: "Podporné organizácie (nadácie, coworkingy…)", farba: "#f28c28" },
+  seniori:       { nazov: "Seniori",                                      farba: "#2e86de" },
+  deti:          { nazov: "Deti a mládež",                                farba: "#8e44ad" },
+  znevyhodneni:  { nazov: "Ľudia so znevýhodnením / v núdzi",             farba: "#27ae60" },
+  komunita:      { nazov: "Komunita, kultúra, prostredie",                farba: "#d4a017" }
+};
+
+// forma: OZ = občianske združenie, NO = nezisková organizácia, NAD = nadácia
+const ORGANIZACIE = [
+// ------- TURIEC / MARTIN -------
+{n:"MARTinklúzia o.z.", k:"znevyhodneni", lat:49.0689, lng:18.9180, obec:"Martin",
+ forma:"Občianske združenie", ico:"", rok:"",
+ popis:"Inklúzia a komunitný život — spoluzaložili komunitné centrum Naboso, pomoc ukrajinským utečencom v Turci. Kontakt: Tomáš Gulán.",
+ web:"", fb:""},
+{n:"[x] cancel coworking", k:"podporne", lat:49.0651, lng:18.9235, obec:"Martin",
+ forma:"Občianske združenie", ico:"", rok:"2015",
+ popis:"Coworking a komunita pre podnikateľov, kreatívcov a freelancerov v Martine.",
+ web:"https://cancel.sk", fb:"https://www.facebook.com/cancelcoworking"},
+{n:"OZ Dobrý pastier", k:"znevyhodneni", lat:48.9808, lng:18.8047, obec:"Kláštor pod Znievom",
+ forma:"Občianske združenie", ico:"42066387", rok:"2008",
+ popis:"Útulok, práca a nový štart pre ľudí bez domova a so závislosťami. Vedie Vladimír Maslák.",
+ web:"https://ozdobrypastier.eu", fb:""},
+{n:"OZ Dom nádeje", k:"znevyhodneni", lat:49.0710, lng:18.9280, obec:"Martin",
+ forma:"Občianske združenie", ico:"42351669", rok:"2014",
+ popis:"Pomoc rodinám v kríze a týraným ženám s deťmi — psychologická, právna a materiálna podpora, podporované bývanie.",
+ web:"https://www.ozdomnadeje.sk", fb:""},
+{n:"CEV Turiec — centrum environmentálnej výchovy", k:"komunita", lat:49.0700, lng:18.9150, obec:"Martin",
+ forma:"Občianske združenie", ico:"42347769", rok:"",
+ popis:"Environmentálna výchova detí a škôl v Turci. Vedie Martin Kondek.",
+ web:"https://www.cevturiec.sk", fb:""},
+{n:"Samaritán, n.o.", k:"seniori", lat:49.0630, lng:18.9190, obec:"Martin",
+ forma:"Nezisková organizácia", ico:"36149721", rok:"1999",
+ popis:"Opatrovateľská služba v domácom prostredí — seniori a ľudia so zdravotným znevýhodnením.",
+ web:"https://samaritan.sk", fb:""},
+{n:"Dom charity sv. Krištofa, Martin", k:"znevyhodneni", lat:49.0640, lng:18.9260, obec:"Martin, Na Kameni 12016",
+ forma:"Zariadenie Diecéznej charity Žilina", ico:"42065895", rok:"",
+ popis:"Nízkoprahové denné centrum a služby pre ľudí bez domova a v núdzi v Turci. Vedie Peter Fekiač.",
+ web:"https://www.charitaza.sk/dom-charity-sv-kristofa/", fb:""},
+{n:"Domová schôdza", k:"komunita", lat:49.0600, lng:18.9300, obec:"Turiec",
+ forma:"Neformálna komunita (len Facebook)", ico:"", rok:"",
+ popis:"Aktívna občianska komunita v Turci.",
+ web:"", fb:""},
+{n:"Premena v Turci o.z.", k:"komunita", lat:49.0672, lng:18.9100, obec:"Martin / Turiec",
+ forma:"Občianske združenie", ico:"42388970", rok:"2013",
+ popis:"Udržateľný rozvoj, kultúra, tvorivosť a environmentálna gramotnosť v Turci. Vedie Juraj Marček.",
+ web:"", fb:""},
+{n:"Diadém — združenie záchrany hradu Blatnica", k:"komunita", lat:48.9367, lng:18.9250, obec:"Blatnica",
+ forma:"Občianske združenie", ico:"42055105", rok:"2006",
+ popis:"Záchrana a obnova hradu Blatnica, ochrana kultúrneho dedičstva.",
+ web:"https://www.zachranmehrady.sk", fb:""},
+{n:"MEDIK-M, n.o.", k:"seniori", lat:49.0617, lng:18.9240, obec:"Martin",
+ forma:"Nezisková organizácia", ico:"45732990", rok:"2010",
+ popis:"Komunitné centrum, opatrovateľská služba, denný stacionár a sociálne služby.",
+ web:"https://www.medikm.sk", fb:"https://www.facebook.com/MedikMno"},
+{n:"Matka a dieťa Turca o.z.", k:"deti", lat:49.0682, lng:18.9265, obec:"Martin",
+ forma:"Občianske združenie", ico:"37981722", rok:"2006",
+ popis:"Podpora mám a detí v martinskej nemocnici — dôstojné podmienky pre rodičov hospitalizovaných detí. Kontakt: Katka Grajciarová.",
+ web:"https://matkaadietaturca.sk", fb:""},
+{n:"WINGS FOREVER, o.z.", k:"deti", lat:49.0725, lng:18.9195, obec:"Martin, Mestská Bôrová 10876/4",
+ forma:"Občianske združenie", ico:"42347301", rok:"2013",
+ popis:"Rodinné centrum — krúžky, angličtina a aktivity pre deti a rodiny. Spoluzakladateľ komunitného centra Naboso.",
+ web:"https://www.wingsmartin.sk", fb:"https://www.facebook.com/Wings.Forever.Martin"},
+{n:"YMCA Martin", k:"deti", lat:49.0645, lng:18.9130, obec:"Martin",
+ forma:"Občianske združenie", ico:"", rok:"",
+ popis:"Kresťanská práca s deťmi a mládežou, športové aktivity a kempy. Kontakt: Igor Pĺž.",
+ web:"https://ymca.sk/martin/", fb:""},
+{n:"ArtGate Gallery", k:"komunita", lat:49.0658, lng:18.9205, obec:"Martin (centrum)",
+ forma:"Galéria", ico:"", rok:"",
+ popis:"Nezávislá galéria v centre Martina. Vedie Matej Haas.",
+ web:"", fb:""},
+
+// ------- ORAVA / DOLNÝ KUBÍN -------
+{n:"Parahokej Slovensko", k:"znevyhodneni", lat:49.2110, lng:19.3010, obec:"Dolný Kubín",
+ forma:"Občianske združenie", ico:"", rok:"",
+ popis:"Domov slovenského parahokeja — šport ľudí so zdravotným znevýhodnením, zastrešuje celé Slovensko.",
+ web:"https://www.parahokej.sk", fb:""},
+{n:"Komunitné služby, s.r.o. — sociálny podnik mesta", k:"znevyhodneni", lat:49.2080, lng:19.2955, obec:"Dolný Kubín",
+ forma:"Registrovaný sociálny podnik", ico:"55823645", rok:"2024",
+ popis:"Mestský sociálny podnik Dolného Kubína.",
+ web:"https://www.komunitnesluzby.sk", fb:""},
+{n:"Oravská knižnica Antona Habovštiaka", k:"podporne", lat:49.2101, lng:19.2930, obec:"Dolný Kubín",
+ forma:"Kultúrna inštitúcia ŽSK", ico:"36145262", rok:"",
+ popis:"Regionálna knižnica — vzdelávacie a komunitné aktivity pre verejnosť.",
+ web:"https://oravskakniznica.sk", fb:"https://www.facebook.com/oravskakniznica"},
+{n:"Klíma ťa potrebuje — DK Hub", k:"komunita", lat:49.2070, lng:19.3020, obec:"Dolný Kubín (miestna skupina)",
+ forma:"Občianske združenie (celoslovenské)", ico:"52825311", rok:"2019",
+ popis:"Klimatická osveta a komunita — miestna skupina v Dolnom Kubíne.",
+ web:"https://klimatapotrebuje.sk", fb:""},
+{n:"Úsmev prosím!", k:"znevyhodneni", lat:49.2120, lng:19.2940, obec:"Dolný Kubín",
+ forma:"Občianske združenie", ico:"", rok:"2021",
+ popis:"Inkluzívne voľnočasové krúžky pre deti a mladých so zdravotným znevýhodnením na Orave a Liptove. Spoluzakladateľka Andrea Kalužová.",
+ web:"https://www.usmevprosim.com", fb:"https://www.facebook.com/usmev.prosim.oz"},
+{n:"OZ Aktív-Relax", k:"komunita", lat:49.2055, lng:19.2900, obec:"Dolný Kubín",
+ forma:"Občianske združenie", ico:"42214637", rok:"",
+ popis:"Ochrana životného prostredia a zmysluplný voľný čas.",
+ web:"", fb:""},
+{n:"Slovenský Červený kríž — Územný spolok Orava", k:"znevyhodneni", lat:49.2088, lng:19.2985, obec:"Dolný Kubín",
+ forma:"Organizačná jednotka SČK", ico:"00416061", rok:"1976",
+ popis:"Humanitárna pomoc, darcovstvo krvi, dobrovoľníctvo na Orave.",
+ web:"https://redcross.sk/dolny-kubin/", fb:"https://www.facebook.com/SlovenskyCervenykrizOrava"},
+{n:"Mladiinfo Dolný Kubín", k:"deti", lat:49.2097, lng:19.3045, obec:"Dolný Kubín (STREDCO)",
+ forma:"Občianske združenie", ico:"", rok:"",
+ popis:"Mobility, dobrovoľníctvo a neformálne vzdelávanie mládeže. Vedie Ondrej Mäsiar.",
+ web:"https://mladiinfo.sk", fb:"https://www.facebook.com/MladiinfoDolnyKubin"},
+{n:"Slovenský zväz telesne postihnutých — ZO Dolný Kubín", k:"znevyhodneni", lat:49.2115, lng:19.3060, obec:"Dolný Kubín",
+ forma:"Organizačná jednotka SZTP", ico:"", rok:"",
+ popis:"Aktivity a šport pre ľudí s telesným postihnutím.",
+ web:"https://www.sztp.sk", fb:""},
+{n:"Komunitné centrum Edukos", k:"znevyhodneni", lat:49.2083, lng:19.2970, obec:"Dolný Kubín",
+ forma:"Občianske združenie", ico:"37801848", rok:"2000",
+ popis:"Komunitné centrum pre znevýhodnené komunity — vzdelávanie, poradenstvo, voľný čas.",
+ web:"https://www.edukos.sk", fb:"https://www.facebook.com/KCedukos"},
+{n:"Garáž klub", k:"deti", lat:49.2125, lng:19.2915, obec:"Dolný Kubín",
+ forma:"Občianske združenie", ico:"", rok:"",
+ popis:"Klub zmysluplného voľného času — workshopy, hudba, tvorivé dielne pre deti a mladých (a všetky generácie).",
+ web:"https://www.garazklub.sk", fb:"https://www.facebook.com/garazklub"},
+{n:"NOWORK.SK", k:"podporne", lat:49.4060, lng:19.4830, obec:"Námestovo, Štefánikova 206",
+ forma:"Coworking", ico:"", rok:"2017",
+ popis:"Prvý coworking na Orave — zdieľané pracovné miesta, kancelárie, prednášky a komunita. Založil Marek Kapičák.",
+ web:"https://www.nowork.sk", fb:"https://www.facebook.com/nowork.sk"},
+{n:"Živý priestor", k:"komunita", lat:49.4079, lng:19.4798, obec:"Námestovo",
+ forma:"Komunita / občianska iniciatíva", ico:"", rok:"",
+ popis:"Hrdí Námestovčania — kultivácia verejného priestoru, environmentálne témy, umenie v priestore a networking aktívnych ľudí na Hornej Orave. Súčasť siete Bystriny.",
+ web:"https://bystriny.sk/koho-spajame/zivy-priestor.html", fb:"https://www.facebook.com/profile.php?id=100087492520246"},
+
+// ------- LIPTOV -------
+{n:"Lesmír, o.z. (My sme les)", k:"komunita", lat:49.0430, lng:19.7200, obec:"Liptovský Hrádok (pôsobisko; sídlo OZ Poprad)",
+ forma:"Občianske združenie", ico:"54509777", rok:"2022",
+ popis:"OZ ochranára Erika Baláža — digitálny sprievodca prírodou a zážitkové náučné chodníky. Baláž je spoluorganizátor celoslovenskej iniciatívy My sme les (od 2017, 71-tisíc ľudí) za ochranu národných parkov.",
+ web:"https://lesmir.sk", fb:"https://www.facebook.com/mysmeles.sk"},
+{n:"Komunitná nadácia Liptov", k:"podporne", lat:49.0403, lng:19.7247, obec:"Liptovský Hrádok",
+ forma:"Nadácia", ico:"37902245", rok:"2003",
+ popis:"Komunitná nadácia pre Liptov — podporuje verejnoprospešné projekty v LM, LH, RK a 80 obciach.",
+ web:"https://www.knl.sk", fb:""},
+{n:"Hory Doly (OZ Verejnô)", k:"komunita", lat:49.0850, lng:19.6060, obec:"Liptovský Mikuláš",
+ forma:"Občianske združenie", ico:"", rok:"2019",
+ popis:"Kultúrno-komunitný priestor a dobrovoľníctvo na Liptove. Založila Saša Matiszová.",
+ web:"https://www.horydolylm.sk", fb:""},
+{n:"Centrum sociálnych služieb ANIMA", k:"seniori", lat:49.0790, lng:19.6350, obec:"Liptovský Mikuláš",
+ forma:"Zariadenie ŽSK", ico:"00647799", rok:"1991",
+ popis:"Zariadenie pre seniorov, domov sociálnych služieb a špecializované zariadenie.",
+ web:"https://jefremovska.dsszsk.sk", fb:""},
+{n:"Súkromná ZŠ Pod Stromom", k:"deti", lat:49.0770, lng:19.6000, obec:"Liptovský Mikuláš",
+ forma:"Súkromná škola", ico:"53813693", rok:"2021",
+ popis:"Alternatívne vzdelávanie — tvoriví učitelia, príroda ako súčasť vyučovania.",
+ web:"https://szspodstromom.edupage.org", fb:""},
+{n:"LeanUP coworking", k:"podporne", lat:49.0748, lng:19.3082, obec:"Ružomberok",
+ forma:"Coworking + vzdelávacie centrum", ico:"", rok:"",
+ popis:"Coworking a vzdelávacie centrum v centre Ružomberka.",
+ web:"https://www.leanup.sk", fb:""},
+{n:"Artecentrum — Ateliér Vo Vile", k:"komunita", lat:49.0983, lng:19.3126, obec:"Likavka",
+ forma:"Ateliér / arteterapia", ico:"", rok:"",
+ popis:"Arteterapia a zážitkové maľovanie — práca so seniormi, deťmi z diagnostických centier aj utečencami. Vedie Regina Lovišková.",
+ web:"https://www.artecentrum.sk", fb:""},
+{n:"iKreON, n.o.", k:"deti", lat:49.0760, lng:19.3040, obec:"Ružomberok",
+ forma:"Nezisková organizácia", ico:"", rok:"",
+ popis:"Erasmus+ projekty, umenie, kultúra a vzdelávanie mladých.",
+ web:"https://ikreon.com", fb:"https://www.facebook.com/IKReON"},
+{n:"Dorka Ružomberok (DORKA, n.o.)", k:"znevyhodneni", lat:49.0795, lng:19.3150, obec:"Ružomberok, Pod Skalami 16",
+ forma:"Nezisková organizácia (pobočka)", ico:"", rok:"2018 (pobočka RK)",
+ popis:"Útulok a Domov na polceste pre mladých dospelých mužov — ubytovanie, sociálne poradenstvo, rozvoj pracovných zručností. Člen skupiny Nadácie DEDO.",
+ web:"https://www.centrumdorka.sk/dorka-ruzomberok/", fb:"https://www.facebook.com/centrumdorka"},
+
+// ------- ŽILINA / KYSUCE -------
+{n:"Diecézna charita Žilina", k:"znevyhodneni", lat:49.2200, lng:18.7350, obec:"Žilina",
+ forma:"Cirkevná organizácia", ico:"42065895", rok:"2008",
+ popis:"Charitatívne a sociálne služby pre ľudí v núdzi v Žilinskej diecéze. Kontakt: Miroslav Olas.",
+ web:"https://www.charitaza.sk", fb:"https://www.facebook.com/DieceznacharitaZilina"},
+{n:"Nadácia Krajina harmónie", k:"podporne", lat:49.2180, lng:18.7450, obec:"Žilina",
+ forma:"Nadácia", ico:"31913130", rok:"1997",
+ popis:"Nezávislý život ľudí so zdravotným znevýhodnením, inkluzívne festivaly a komunita. Vedie Soňa Holúbková.",
+ web:"https://nkh.sk", fb:"https://www.facebook.com/NadaciaKrajinaHarmonie"},
+{n:"Sekcia pre mládež ŽSK (MAIC / Na1Vlne)", k:"deti", lat:49.2192, lng:18.7539, obec:"Žilina (Úrad ŽSK)",
+ forma:"Sekcia Žilinského samosprávneho kraja", ico:"37808427 (ŽSK)", rok:"2020",
+ popis:"Krajská sekcia pre mládež — počúva mladých na úrovni kraja, koncepcia práce s mládežou Na1Vlne 2021+, podpora neformálneho vzdelávania a dobrovoľníctva.",
+ web:"https://www.na1vlne.sk", fb:"https://www.facebook.com/sekciapremladezzsk"},
+{n:"Rada mládeže Žilinského kraja", k:"deti", lat:49.2250, lng:18.7420, obec:"Žilina",
+ forma:"Občianske združenie (strešná org.)", ico:"37807552", rok:"2001",
+ popis:"Strešná organizácia detských a mládežníckych organizácií v kraji.",
+ web:"https://www.rmzk.sk", fb:"https://www.facebook.com/RadaMladezeZA"},
+{n:"Žilinské dobrovoľnícke centrum", k:"podporne", lat:49.2215, lng:18.7480, obec:"Žilina",
+ forma:"Org. jednotka OZ V.I.A.C.", ico:"", rok:"2016",
+ popis:"Servisná organizácia pre dobrovoľníkov a dobrovoľnícke organizácie v kraji.",
+ web:"https://dobrovolnictvoza.sk", fb:"https://www.facebook.com/dczilina"},
+{n:"Nadácia Mesta Žilina", k:"podporne", lat:49.2270, lng:18.7370, obec:"Žilina",
+ forma:"Nadácia", ico:"51133911", rok:"2017",
+ popis:"Pomoc jednotlivcom a rodinám v núdzi na území mesta Žilina. Správkyňa Anna Barčíková.",
+ web:"https://nadacia.zilina.sk", fb:"https://www.facebook.com/NadaciaMestaZilina"},
+{n:"Centrum včasnej intervencie Žilina, n.o.", k:"znevyhodneni", lat:49.2130, lng:18.7500, obec:"Žilina",
+ forma:"Nezisková organizácia", ico:"45744009", rok:"",
+ popis:"Podpora rodín s deťmi 0–7 rokov, ktorých vývin je ohrozený zdravotným znevýhodnením.",
+ web:"https://www.cvizilina.sk", fb:"https://www.facebook.com/centrumvcasnejintervenciezilina"},
+{n:"VIRTUÁLNA ŠÉFKA, r.s.p.", k:"znevyhodneni", lat:49.2160, lng:18.7420, obec:"Žilina",
+ forma:"Registrovaný sociálny podnik (integračný)", ico:"", rok:"2025",
+ popis:"Prepája mikropodnikateľov so znevýhodnenými a zdravotne postihnutými ľuďmi — flexibilné úväzky a šanca na trhu práce. Vedie Ingrid Nová Almáši.",
+ web:"https://sk.linkedin.com/in/ingrid-nova-almasi", fb:""},
+{n:"Platforma rodín detí so zdravotným znevýhodnením — RC Žilina", k:"znevyhodneni", lat:49.2246, lng:18.7365, obec:"Žilina, Kálov 3",
+ forma:"Občianske združenie (regionálne centrum)", ico:"50525654", rok:"2016 (RC ZA od 2024)",
+ popis:"Podpora rodín detí s akýmkoľvek zdravotným znevýhodnením — peer poradenstvo, rodičovské skupiny, inkluzívne podujatia. Peer poradcovia pôsobia po celom kraji (Martin: Eliška Kapitáňová).",
+ web:"https://www.platformarodin.sk", fb:"https://www.facebook.com/groups/1568938633853343"},
+{n:"ANEPS — Krajské centrum nepočujúcich Žilina", k:"znevyhodneni", lat:49.2240, lng:18.7330, obec:"Žilina",
+ forma:"Občianske združenie", ico:"30868904", rok:"",
+ popis:"Poradenstvo, tlmočenie a služby pre nepočujúcich v kraji.",
+ web:"https://www.kcanepsza.sk", fb:"https://www.facebook.com/aneps.sk"},
+{n:"Nadácia Kia Slovakia", k:"podporne", lat:49.2264, lng:18.8125, obec:"Teplička nad Váhom",
+ forma:"Nadácia", ico:"42349826", rok:"2013",
+ popis:"Firemná nadácia — podpora komunít, športu a vzdelávania v regióne.",
+ web:"https://www.nadaciakia.sk", fb:""},
+{n:"Nadácia ŽSK pre podporu rodiny", k:"podporne", lat:49.2210, lng:18.7290, obec:"Žilina",
+ forma:"Nadácia", ico:"51844508", rok:"2018",
+ popis:"Pomoc rodinám v ťažkých životných situáciách v Žilinskom kraji.",
+ web:"https://nadaciazsk.sk", fb:""},
+{n:"KERIC", k:"deti", lat:49.4387, lng:18.7895, obec:"Čadca",
+ forma:"Občianske združenie", ico:"37901281", rok:"2003",
+ popis:"Deti a mládež 4–30 rokov — medzinárodné dobrovoľníctvo, jazyky, neformálne vzdelávanie.",
+ web:"https://www.keric.sk", fb:""},
+{n:"OZ pre krajšie Kysuce", k:"komunita", lat:49.4986, lng:18.7867, obec:"Svrčinovec",
+ forma:"Občianske združenie", ico:"51649314", rok:"2018",
+ popis:"Dobrovoľnícke zveľaďovanie verejného priestoru na Kysuciach.",
+ web:"https://krajsiekysuce.sk", fb:""},
+{n:"INOVIA — inovačné centrum", k:"podporne", lat:49.2231, lng:18.7394, obec:"Žilina",
+ forma:"Inovačné centrum", ico:"", rok:"",
+ popis:"Inovačné centrum Žilinského kraja — podpora inovácií vrátane sociálnych inovácií (HUSI — Hub sociálnych inovácií).",
+ web:"https://inovia.sk", fb:""}
+];
+
+const map = L.map('map').setView([49.15, 19.15], 9);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap prispievatelia | hranica kraja: OSM (relácia 388269)'
+}).addTo(map);
+
+// Hranica Žilinského kraja — oficiálne dáta OpenStreetMap (admin_level 4, relácia 388269)
+const HRANICA_ZSK = {"type":"Polygon","coordinates":[[[18.315,49.325],[18.37,49.335],[18.39,49.355],[18.39,49.365],[18.4,49.365],[18.395,49.405],[18.405,49.41],[18.445,49.405],[18.465,49.415],[18.485,49.445],[18.525,49.465],[18.525,49.495],[18.55,49.515],[18.605,49.52],[18.61,49.505],[18.625,49.505],[18.68,49.52],[18.695,49.51],[18.755,49.5],[18.77,49.515],[18.8,49.525],[18.945,49.53],[18.985,49.505],[18.975,49.485],[18.975,49.46],[19,49.435],[18.99,49.41],[19.035,49.405],[19.05,49.425],[19.07,49.43],[19.1,49.425],[19.11,49.415],[19.13,49.42],[19.16,49.415],[19.18,49.425],[19.175,49.44],[19.195,49.46],[19.215,49.46],[19.21,49.48],[19.225,49.5],[19.225,49.52],[19.275,49.545],[19.325,49.54],[19.36,49.545],[19.355,49.555],[19.37,49.58],[19.39,49.58],[19.4,49.6],[19.43,49.605],[19.435,49.62],[19.445,49.625],[19.47,49.625],[19.485,49.61],[19.485,49.595],[19.54,49.58],[19.54,49.54],[19.58,49.47],[19.6,49.47],[19.61,49.46],[19.65,49.465],[19.65,49.445],[19.66,49.44],[19.65,49.42],[19.69,49.415],[19.715,49.4],[19.765,49.425],[19.8,49.415],[19.8,49.385],[19.815,49.37],[19.81,49.36],[19.815,49.315],[19.805,49.305],[19.82,49.3],[19.835,49.275],[19.825,49.265],[19.8,49.26],[19.795,49.24],[19.78,49.235],[19.775,49.215],[19.785,49.21],[19.82,49.215],[19.84,49.205],[19.865,49.205],[19.875,49.215],[19.905,49.21],[19.91,49.195],[19.93,49.18],[19.93,49.15],[19.965,49.155],[19.97,49.165],[20,49.175],[20.01,49.17],[20.01,49.155],[19.975,49.125],[20,49.115],[20.04,49.12],[20.05,49.105],[20.04,49.09],[20.035,49.045],[20.025,49.035],[20.025,49.01],[19.995,49],[20.035,48.97],[20.04,48.945],[20.07,48.94],[20.07,48.925],[20.03,48.9],[19.975,48.905],[19.955,48.895],[19.825,48.895],[19.815,48.905],[19.8,48.905],[19.74,48.885],[19.695,48.915],[19.66,48.91],[19.63,48.93],[19.59,48.935],[19.475,48.93],[19.465,48.92],[19.385,48.915],[19.36,48.89],[19.335,48.885],[19.325,48.86],[19.265,48.845],[19.245,48.85],[19.245,48.865],[19.255,48.87],[19.245,48.885],[19.19,48.87],[19.165,48.875],[19.105,48.865],[19.06,48.865],[19.045,48.875],[19.01,48.84],[19.015,48.82],[19.005,48.805],[19.025,48.795],[19.025,48.775],[19.02,48.755],[19.005,48.74],[18.995,48.735],[18.945,48.74],[18.935,48.73],[18.92,48.73],[18.905,48.74],[18.885,48.74],[18.88,48.755],[18.86,48.755],[18.85,48.74],[18.82,48.735],[18.815,48.75],[18.79,48.775],[18.765,48.785],[18.765,48.8],[18.755,48.81],[18.69,48.84],[18.685,48.885],[18.695,48.895],[18.685,48.9],[18.685,48.935],[18.7,48.94],[18.69,48.95],[18.655,48.945],[18.635,48.955],[18.61,48.955],[18.605,48.945],[18.59,48.945],[18.585,48.955],[18.57,48.955],[18.565,48.94],[18.545,48.94],[18.525,48.925],[18.47,48.93],[18.455,48.945],[18.46,48.965],[18.495,48.975],[18.5,48.99],[18.52,49],[18.565,49.005],[18.58,49.03],[18.59,49.03],[18.59,49.065],[18.57,49.08],[18.545,49.085],[18.555,49.105],[18.575,49.115],[18.565,49.12],[18.565,49.135],[18.545,49.14],[18.545,49.15],[18.515,49.155],[18.475,49.18],[18.46,49.18],[18.455,49.2],[18.435,49.21],[18.43,49.235],[18.415,49.245],[18.42,49.255],[18.405,49.26],[18.36,49.31],[18.345,49.305],[18.315,49.31],[18.315,49.325]]]};
+L.geoJSON(HRANICA_ZSK, {
+  style: { color:"#1a3c5e", weight:2.5, dashArray:"7 5", fill:true, fillColor:"#1a3c5e", fillOpacity:0.03 }
+}).addTo(map);
+
+const vrstvy = {};
+Object.keys(KATEGORIE).forEach(k => { vrstvy[k] = L.layerGroup().addTo(map); });
+const MARKERY = [];
+const legendDivy = {};
+
+ORGANIZACIE.forEach(o => {
+  const kat = KATEGORIE[o.k];
+  const m = L.circleMarker([o.lat, o.lng], {
+    radius: 9, fillColor: kat.farba, color: "#ffffff",
+    weight: 2, opacity: 1, fillOpacity: 0.9
+  });
+  let html = `<div class="popup-nazov">${o.n}</div>`;
+  html += `<div class="popup-row"><b>Obec:</b> ${o.obec}</div>`;
+  if (o.forma) html += `<div class="popup-row"><b>Forma:</b> ${o.forma}</div>`;
+  if (o.ico)  html += `<div class="popup-row"><b>IČO:</b> ${o.ico}</div>`;
+  if (o.rok)  html += `<div class="popup-row"><b>Vznik:</b> ${o.rok}</div>`;
+  html += `<div class="popup-desc">${o.popis}</div>`;
+  let linky = [];
+  if (o.web) linky.push(`<a href="${o.web}" target="_blank">🌐 web</a>`);
+  if (o.fb)  linky.push(`<a href="${o.fb}" target="_blank">📘 Facebook</a>`);
+  if (linky.length) html += `<div class="popup-links">${linky.join(" ")}</div>`;
+  m.bindPopup(html);
+  m.addTo(vrstvy[o.k]);
+  MARKERY.push({ o, m });
+});
+
+// legenda s filtrami
+const legenda = document.getElementById('legend');
+Object.entries(KATEGORIE).forEach(([k, kat]) => {
+  const pocet = ORGANIZACIE.filter(o => o.k === k).length;
+  const div = document.createElement('div');
+  div.className = 'legend-item';
+  div.innerHTML = `<span class="legend-dot" style="background:${kat.farba}"></span> ${kat.nazov} (${pocet})`;
+  div.onclick = () => {
+    if (map.hasLayer(vrstvy[k])) { map.removeLayer(vrstvy[k]); div.classList.add('off'); }
+    else { map.addLayer(vrstvy[k]); div.classList.remove('off'); }
+  };
+  legendDivy[k] = div;
+  legenda.insertBefore(div, legenda.querySelector('small'));
+});
+
+// bočný zoznam A–Z
+const zoznam = document.getElementById('panel-list');
+MARKERY
+  .slice()
+  .sort((a, b) => a.o.n.localeCompare(b.o.n, 'sk'))
+  .forEach(({ o, m }) => {
+    const div = document.createElement('div');
+    div.className = 'panel-item';
+    div.innerHTML = `<span class="panel-dot" style="background:${KATEGORIE[o.k].farba}"></span><span>${o.n}</span>`;
+    div.onclick = () => {
+      if (!map.hasLayer(vrstvy[o.k])) {
+        map.addLayer(vrstvy[o.k]);
+        legendDivy[o.k].classList.remove('off');
+      }
+      map.setView([o.lat, o.lng], 13);
+      m.openPopup();
+    };
+    zoznam.appendChild(div);
+  });
+</script>
+</body>
+</html>
