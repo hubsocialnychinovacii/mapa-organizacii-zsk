@@ -43,6 +43,17 @@
   .legend-item.off { opacity:0.35; }
   .legend-dot { width:14px; height:14px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 3px rgba(0,0,0,0.5); flex-shrink:0; }
   .legend small { color:#777; display:block; margin-top:6px; }
+  #legend-close {
+    position:absolute; top:6px; right:8px; border:none; background:none;
+    font-size:15px; cursor:pointer; color:#888; padding:2px 4px; line-height:1;
+  }
+  #legend-close:hover { color:#1a3c5e; }
+  #legend-open {
+    position:absolute; bottom:20px; left:10px; z-index:1000; display:none;
+    background:rgba(255,255,255,0.95); border-radius:10px; padding:8px 14px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.25); font-size:13px; cursor:pointer;
+    color:#1a3c5e; font-weight:600;
+  }
   .popup-nazov { font-size:14px; font-weight:700; color:#1a3c5e; margin-bottom:4px; }
   .popup-row { font-size:12px; margin:2px 0; }
   .popup-row b { color:#555; }
@@ -69,9 +80,11 @@
 </div>
 
 <div class="legend" id="legend">
+  <button id="legend-close" title="Skryť legendu">✕</button>
   <h3>Legenda — klikni pre filter</h3>
   <small>Poloha bodov je orientačná (obec/ulica).<br>Údaje: verejné registre a weby organizácií, 7/2026.</small>
 </div>
+<div id="legend-open">Legenda ▲</div>
 
 <script>
 const KATEGORIE = {
@@ -88,8 +101,8 @@ const ORGANIZACIE = [
 {n:"MARTinklúzia o.z.", k:"znevyhodneni", lat:49.0689, lng:18.9180, obec:"Martin",
  forma:"Občianske združenie", ico:"", rok:"",
  popis:"Inklúzia a komunitný život — spoluzaložili komunitné centrum Naboso, pomoc ukrajinským utečencom v Turci. Kontakt: Tomáš Gulán.",
- web:"", fb:""},
-{n:"[x] cancel coworking", k:"podporne", lat:49.0651, lng:18.9235, obec:"Martin",
+ web:"", fb:"https://www.facebook.com/p/Naboso-Martin-61563999130366"},
+{n:"cancel coworking", k:"podporne", lat:49.0651, lng:18.9235, obec:"Martin",
  forma:"Občianske združenie", ico:"", rok:"2015",
  popis:"Coworking a komunita pre podnikateľov, kreatívcov a freelancerov v Martine.",
  web:"https://cancel.sk", fb:"https://www.facebook.com/cancelcoworking"},
@@ -113,18 +126,18 @@ const ORGANIZACIE = [
  forma:"Zariadenie Diecéznej charity Žilina", ico:"42065895", rok:"",
  popis:"Nízkoprahové denné centrum a služby pre ľudí bez domova a v núdzi v Turci. Vedie Peter Fekiač.",
  web:"https://www.charitaza.sk/dom-charity-sv-kristofa/", fb:""},
-{n:"Domová schôdza", k:"komunita", lat:49.0600, lng:18.9300, obec:"Turiec",
- forma:"Neformálna komunita (len Facebook)", ico:"", rok:"",
- popis:"Aktívna občianska komunita v Turci.",
- web:"", fb:""},
+{n:"Parta — kultúrna platforma", k:"komunita", lat:49.0600, lng:18.9300, obec:"Martin",
+ forma:"Kultúrna platforma", ico:"", rok:"",
+ popis:"Dizajnéri, umelci a kultúrni aktivisti v Martine — Kultrh, Kultúrny dialóg a ďalšie podujatia. Organizujú aj aktívne susedské stretnutia „Domová schôdza".",
+ web:"https://www.kulturnaparta.sk", fb:"https://www.facebook.com/KulturnaParta"},
 {n:"Premena v Turci o.z.", k:"komunita", lat:49.0672, lng:18.9100, obec:"Martin / Turiec",
  forma:"Občianske združenie", ico:"42388970", rok:"2013",
  popis:"Udržateľný rozvoj, kultúra, tvorivosť a environmentálna gramotnosť v Turci. Vedie Juraj Marček.",
- web:"", fb:""},
+ web:"", fb:"https://www.facebook.com/premenavturci"},
 {n:"Diadém — združenie záchrany hradu Blatnica", k:"komunita", lat:48.9367, lng:18.9250, obec:"Blatnica",
  forma:"Občianske združenie", ico:"42055105", rok:"2006",
  popis:"Záchrana a obnova hradu Blatnica, ochrana kultúrneho dedičstva.",
- web:"https://www.zachranmehrady.sk", fb:""},
+ web:"https://www.zachranmehrady.sk", fb:"https://www.facebook.com/257337281640680"},
 {n:"MEDIK-M, n.o.", k:"seniori", lat:49.0617, lng:18.9240, obec:"Martin",
  forma:"Nezisková organizácia", ico:"45732990", rok:"2010",
  popis:"Komunitné centrum, opatrovateľská služba, denný stacionár a sociálne služby.",
@@ -144,7 +157,7 @@ const ORGANIZACIE = [
 {n:"ArtGate Gallery", k:"komunita", lat:49.0658, lng:18.9205, obec:"Martin (centrum)",
  forma:"Galéria", ico:"", rok:"",
  popis:"Nezávislá galéria v centre Martina. Vedie Matej Haas.",
- web:"", fb:""},
+ web:"https://www.instagram.com/artgate_gallery/", fb:""},
 
 // ------- ORAVA / DOLNÝ KUBÍN -------
 {n:"Parahokej Slovensko", k:"znevyhodneni", lat:49.2110, lng:19.3010, obec:"Dolný Kubín",
@@ -267,10 +280,10 @@ const ORGANIZACIE = [
  forma:"Nezisková organizácia", ico:"45744009", rok:"",
  popis:"Podpora rodín s deťmi 0–7 rokov, ktorých vývin je ohrozený zdravotným znevýhodnením.",
  web:"https://www.cvizilina.sk", fb:"https://www.facebook.com/centrumvcasnejintervenciezilina"},
-{n:"VIRTUÁLNA ŠÉFKA, r.s.p.", k:"znevyhodneni", lat:49.2160, lng:18.7420, obec:"Žilina",
- forma:"Registrovaný sociálny podnik (integračný)", ico:"", rok:"2025",
+{n:"VIRTUÁLNA ŠÉFKA, r.s.p.", k:"znevyhodneni", lat:49.0605, lng:18.9215, obec:"Martin, Kollárova 5781",
+ forma:"Registrovaný sociálny podnik (integračný, č. 740/2025_RSP)", ico:"56773528", rok:"2025",
  popis:"Prepája mikropodnikateľov so znevýhodnenými a zdravotne postihnutými ľuďmi — flexibilné úväzky a šanca na trhu práce. Vedie Ingrid Nová Almáši.",
- web:"https://sk.linkedin.com/in/ingrid-nova-almasi", fb:""},
+ web:"https://www.inasefka.sk", fb:""},
 {n:"Platforma rodín detí so zdravotným znevýhodnením — RC Žilina", k:"znevyhodneni", lat:49.2246, lng:18.7365, obec:"Žilina, Kálov 3",
  forma:"Občianske združenie (regionálne centrum)", ico:"50525654", rok:"2016 (RC ZA od 2024)",
  popis:"Podpora rodín detí s akýmkoľvek zdravotným znevýhodnením — peer poradenstvo, rodičovské skupiny, inkluzívne podujatia. Peer poradcovia pôsobia po celom kraji (Martin: Eliška Kapitáňová).",
@@ -353,6 +366,17 @@ Object.entries(KATEGORIE).forEach(([k, kat]) => {
   legendDivy[k] = div;
   legenda.insertBefore(div, legenda.querySelector('small'));
 });
+
+// skrytie/zobrazenie legendy (hlavne pre mobil)
+const legendOpen = document.getElementById('legend-open');
+document.getElementById('legend-close').onclick = () => {
+  legenda.style.display = 'none';
+  legendOpen.style.display = 'block';
+};
+legendOpen.onclick = () => {
+  legenda.style.display = 'block';
+  legendOpen.style.display = 'none';
+};
 
 // bočný zoznam A–Z
 const zoznam = document.getElementById('panel-list');
